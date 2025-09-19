@@ -15,6 +15,7 @@ import {
     CLEAR_MESSAGES,
     LOAD_MESSAGES_FROM_STORAGE,
 } from "./constants";
+import { chatService } from "../../services/chatService";
 
 const FloatingButton = styled(Button)`
     position: fixed;
@@ -358,6 +359,16 @@ const suggestedQuestions = [
     "How do I contact support?",
 ];
 
+// Get dynamic suggested questions from templates
+const getSuggestedQuestions = (templates) => {
+    if (!templates || templates.length === 0) {
+        return suggestedQuestions; // fallback to hardcoded
+    }
+    return templates
+        .slice(0, 4)
+        .map((template) => template.messages[0]?.content || template.name);
+};
+
 // Auto-complete options
 const autoCompleteOptions = [
     { value: "pricing", label: "pricing information" },
@@ -413,11 +424,30 @@ const ChatBotWidget = () => {
     const [inputValue, setInputValue] = useState("");
     const [autoCompleteData, setAutoCompleteData] = useState([]);
     const [showSmartSuggestions, setShowSmartSuggestions] = useState(false);
+    const [templates, setTemplates] = useState([]);
+    const [templatesLoading, setTemplatesLoading] = useState(false);
     const dispatch = useDispatch();
     const { messages, typing } = useSelector((state) => state.chatBot);
     const messagesEndRef = useRef(null);
 
     const [isFirstVisit, setIsFirstVisit] = useState(true);
+
+    // Fetch conversation templates on component mount
+    useEffect(() => {
+        const fetchTemplates = async () => {
+            try {
+                setTemplatesLoading(true);
+                const templateData = await chatService.getTemplates();
+                setTemplates(templateData);
+            } catch (error) {
+                console.error("Failed to fetch conversation templates:", error);
+            } finally {
+                setTemplatesLoading(false);
+            }
+        };
+
+        fetchTemplates();
+    }, []);
 
     // Load messages from localStorage on component mount
     useEffect(() => {
@@ -741,22 +771,34 @@ const ChatBotWidget = () => {
 
                         {shouldShowSuggestedQuestions() && (
                             <SuggestedQuestionsContainer>
-                                <SuggestedQuestionsGrid>
-                                    {suggestedQuestions.map(
-                                        (question, index) => (
-                                            <SuggestedQuestionItem
-                                                key={index}
-                                                onClick={() =>
-                                                    handleSuggestedQuestionClick(
-                                                        question
-                                                    )
-                                                }
-                                            >
-                                                {question}
-                                            </SuggestedQuestionItem>
-                                        )
-                                    )}
-                                </SuggestedQuestionsGrid>
+                                {templatesLoading ? (
+                                    <div
+                                        style={{
+                                            textAlign: "center",
+                                            padding: "10px",
+                                            color: "#666",
+                                        }}
+                                    >
+                                        Loading conversation starters...
+                                    </div>
+                                ) : (
+                                    <SuggestedQuestionsGrid>
+                                        {getSuggestedQuestions(templates).map(
+                                            (question, index) => (
+                                                <SuggestedQuestionItem
+                                                    key={index}
+                                                    onClick={() =>
+                                                        handleSuggestedQuestionClick(
+                                                            question
+                                                        )
+                                                    }
+                                                >
+                                                    {question}
+                                                </SuggestedQuestionItem>
+                                            )
+                                        )}
+                                    </SuggestedQuestionsGrid>
+                                )}
                             </SuggestedQuestionsContainer>
                         )}
                     </ChatBody>

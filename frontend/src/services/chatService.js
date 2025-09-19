@@ -126,21 +126,21 @@ export const healthService = {
     },
 
     /**
-     * Get API information
-     * @returns {Promise<Object>} API info
+     * Get conversation templates
+     * @returns {Promise<Object>} Response with available templates
      */
-    async getApiInfo() {
+    async getTemplates() {
         try {
-            const response = await api.get("/");
+            const response = await api.get("/chat/templates");
             return {
                 success: true,
                 data: response.data,
             };
         } catch (error) {
-            console.error("Error fetching API info:", error);
+            console.error("Error fetching templates:", error);
             return {
                 success: false,
-                error: error.response?.data?.message || error.message,
+                error: error.message,
             };
         }
     },

@@ -174,7 +174,15 @@ class ImplementationComparator {
                 };
             } else {
                 // Test Python chat response
-                const pythonArgs = ["chat", query, provider, "true", "3"];
+                const sessionId = `test_session_${Date.now()}`;
+                const pythonArgs = [
+                    "chat",
+                    query,
+                    sessionId,
+                    provider,
+                    "true",
+                    "3",
+                ];
                 const result = await pythonProcessManager.executeScript(
                     "rag_chatbot",
                     pythonArgs
@@ -304,24 +312,8 @@ class ImplementationComparator {
                         ? "JavaScript"
                         : "Python";
                 const diff = Math.abs(jsTest.duration - pythonTest.duration);
-                console.log(`   Winner: ${faster} (by ${diff}ms)`);
+                console.log(`   :) ${faster} (by ${diff}ms)`);
             }
-        }
-
-        // Recommendations
-        console.log(`\n💡 Recommendations:`);
-        if (jsSuccessful > pythonSuccessful) {
-            console.log(`- JavaScript implementation has higher success rate`);
-        } else if (pythonSuccessful > jsSuccessful) {
-            console.log(`- Python implementation has higher success rate`);
-        } else {
-            console.log(`- Both implementations have similar success rates`);
-        }
-
-        if (this.results.javascript.totalTime < this.results.python.totalTime) {
-            console.log(`- JavaScript implementation is faster overall`);
-        } else {
-            console.log(`- Python implementation is faster overall`);
         }
 
         return this.results;

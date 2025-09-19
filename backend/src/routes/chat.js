@@ -271,7 +271,7 @@ router.post(
                 provider = "gemini",
                 useRag = true,
                 topK = 3,
-                implementation = "javascript",
+                implementation = "python",
             } = req.body;
 
             logger.info("Processing chat message", {

@@ -162,7 +162,8 @@ Please respond naturally to the user's message:"""
                 'provider': llm_result['provider'],
                 'model': llm_result['model'],
                 'usage': llm_result['usage'],
-                'conversational': True,
+                'ragUsed': False,
+                'contextDocuments': 0,
                 'session_id': session_id,
                 'query': query
             }
@@ -239,14 +240,14 @@ Response:"""
                 'provider': llm_result['provider'],
                 'model': llm_result['model'],
                 'usage': llm_result['usage'],
-                'rag_used': True,
-                'context_documents': len(context_docs),
+                'ragUsed': True,
+                'contextDocuments': len(context_docs),
                 'session_id': session_id,
                 'query': query
             }
 
             if context_docs:
-                result['retrieved_documents'] = context_docs
+                result['retrievedDocuments'] = context_docs
 
             return result
 

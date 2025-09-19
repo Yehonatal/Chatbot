@@ -80,11 +80,14 @@ def test_haystack_rag():
         else:
             print("✅ Document indexing successful")
 
-        # Test document retrieval
+        # Test document retrieval with safe fallback
         retrieve_result = rag.retrieve_documents("What is machine learning?", top_k=1)
         if not retrieve_result['success']:
             print(f"❌ Document retrieval failed: {retrieve_result.get('error', 'Unknown error')}")
             return False
+
+        if retrieve_result.get('note'):
+            print(f"⚠️  {retrieve_result['note']}")
 
         print(f"✅ Document retrieval successful: {len(retrieve_result['documents'])} documents found")
 

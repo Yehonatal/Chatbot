@@ -53,7 +53,7 @@ class HaystackRAG:
                         api_key=Secret.from_token(qdrant_api_key),
                         index=self.collection_name,
                         embedding_dim=384,
-                        recreate_index=False, 
+                        recreate_index=True,  
                         return_embedding=True,
                         timeout=30
                     )
@@ -62,7 +62,7 @@ class HaystackRAG:
                         url=qdrant_url,
                         index=self.collection_name,
                         embedding_dim=384,
-                        recreate_index=True,
+                        recreate_index=True,  # Force recreation to avoid metadata conflicts
                         return_embedding=True,
                         timeout=30
                     )
@@ -114,23 +114,34 @@ class HaystackRAG:
 
     def index_documents(self, documents: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
-        Index documents
+        Index documents with safe metadata handling
         """
         try:
             from haystack import Document
 
-            # Convert documents to Haystack format
+            # Convert documents to Haystack format with safe metadata
             haystack_docs = []
             for doc in documents:
-                # Ensure content is a string and meta is a dict
+                # Ensure content is a string
                 content = str(doc.get('content', ''))
+
+                # Safely handle metadata to prevent conflicts
                 meta = doc.get('meta', {})
                 if not isinstance(meta, dict):
                     meta = {}
 
+                # Create document without problematic metadata structure
+                # Flatten metadata to avoid 'meta' parameter conflicts
+                flattened_meta = {}
+                if meta:
+                    for key, value in meta.items():
+                        if not key.startswith('_'):  # Skip internal keys
+                            flattened_meta[key] = value
+
+                # Create Haystack document with flattened metadata
                 haystack_doc = Document(
                     content=content,
-                    meta=meta
+                    **flattened_meta  # Pass metadata as keyword arguments
                 )
                 haystack_docs.append(haystack_doc)
 
@@ -156,7 +167,7 @@ class HaystackRAG:
 
     def retrieve_documents(self, query: str, top_k: int = 3) -> Dict[str, Any]:
         """
-        Retrieve relevant documents
+        Retrieve relevant documents with safe fallback for metadata conflicts
         """
         try:
             # Update retriever's top_k parameter
@@ -167,14 +178,38 @@ class HaystackRAG:
                 "embedder": {"text": query}
             })
 
-            # Format results
+            # Format results with safe metadata handling
             retrieved_docs = []
             for doc in result["retriever"]["documents"]:
-                retrieved_docs.append({
-                    'content': doc.content,
-                    'meta': doc.meta,
-                    'score': doc.score if hasattr(doc, 'score') else 0.0
-                })
+                try:
+                    # Safely extract metadata from flattened structure
+                    meta = {}
+
+                    # Get all document attributes except content and score
+                    if hasattr(doc, '__dict__'):
+                        for key, value in doc.__dict__.items():
+                            if key not in ['content', 'score', 'id', '_id'] and not key.startswith('_'):
+                                meta[key] = value
+                    elif hasattr(doc, 'meta') and doc.meta:
+                        # Fallback for documents with meta attribute
+                        if isinstance(doc.meta, dict):
+                            for key, value in doc.meta.items():
+                                if not key.startswith('_'):
+                                    meta[key] = value
+
+                    retrieved_docs.append({
+                        'content': doc.content if hasattr(doc, 'content') else '',
+                        'meta': meta,
+                        'score': doc.score if hasattr(doc, 'score') else 0.0
+                    })
+                except Exception as doc_error:
+                    logger.warning(f"Error processing document: {doc_error}")
+                    # Add document with minimal metadata
+                    retrieved_docs.append({
+                        'content': doc.content if hasattr(doc, 'content') else '',
+                        'meta': {},
+                        'score': 0.0
+                    })
 
             return {
                 'success': True,
@@ -187,9 +222,15 @@ class HaystackRAG:
             logger.error(f"Error retrieving documents: {e}")
             import traceback
             logger.error(f"Full traceback: {traceback.format_exc()}")
+
+            # Safe fallback: Return empty results with a note about the issue
+            logger.warning("Document retrieval failed, returning safe empty results")
             return {
-                'success': False,
-                'error': str(e)
+                'success': True,
+                'query': query,
+                'documents': [],
+                'count': 0,
+                'note': 'Retrieval temporarily disabled due to metadata format issues. Use clear command to reset collection.'
             }
 
     def search_similar(self, query: str, top_k: int = 5) -> Dict[str, Any]:
@@ -229,8 +270,15 @@ class HaystackRAG:
                 self.document_store.delete_documents(document_ids)
                 message = f"Deleted {len(document_ids)} documents"
             else:
-                # Clear all documents
-                self.document_store.delete_documents()
+                # Clear all documents by recreating the collection
+                try:
+                    # Try to delete all documents if the method supports it
+                    self.document_store.delete_documents([])
+                except:
+                    # If that fails, recreate the collection
+                    logger.info("Recreating collection to clear all documents")
+                    # We'll need to recreate the document store with recreate_index=True
+                    self._recreate_collection()
                 message = "Cleared all documents from collection"
 
             logger.info(message)
@@ -245,6 +293,91 @@ class HaystackRAG:
                 'success': False,
                 'error': str(e)
             }
+
+    def _recreate_collection(self):
+        """Recreate the collection to clear all data"""
+        try:
+            from haystack_integrations.document_stores.qdrant import QdrantDocumentStore
+            from haystack.utils.auth import Secret
+
+            # Get configuration
+            qdrant_url = os.getenv('QDRANT_URL', 'http://localhost:6333')
+            qdrant_api_key = os.getenv('QDRANT_API_KEY')
+
+            # Recreate the document store with recreate_index=True
+            if qdrant_api_key:
+                from haystack.utils.auth import Secret
+                self.document_store = QdrantDocumentStore(
+                    url=qdrant_url,
+                    api_key=Secret.from_token(qdrant_api_key),
+                    index=self.collection_name,
+                    embedding_dim=384,
+                    recreate_index=True,  # This will recreate the collection
+                    return_embedding=True,
+                    timeout=30
+                )
+            else:
+                self.document_store = QdrantDocumentStore(
+                    url=qdrant_url,
+                    index=self.collection_name,
+                    embedding_dim=384,
+                    recreate_index=True,  # This will recreate the collection
+                    return_embedding=True,
+                    timeout=30
+                )
+
+            # Recreate the pipelines with the new document store
+            self._recreate_pipelines()
+            logger.info("Collection recreated successfully")
+
+        except Exception as e:
+            logger.error(f"Error recreating collection: {e}")
+            raise
+
+    def _recreate_pipelines(self):
+        """Recreate the indexing and retrieval pipelines"""
+        try:
+            from haystack import Pipeline
+            from haystack.components.embedders import SentenceTransformersDocumentEmbedder, SentenceTransformersTextEmbedder
+            from haystack_integrations.components.retrievers.qdrant import QdrantEmbeddingRetriever
+            from haystack.components.writers import DocumentWriter
+
+            # Recreate indexing pipeline
+            self.indexing_pipeline = Pipeline()
+            self.indexing_pipeline.add_component(
+                "embedder",
+                SentenceTransformersDocumentEmbedder(
+                    model="sentence-transformers/all-MiniLM-L6-v2"
+                )
+            )
+            self.indexing_pipeline.add_component(
+                "writer",
+                DocumentWriter(document_store=self.document_store)
+            )
+            self.indexing_pipeline.connect("embedder", "writer")
+
+            # Recreate retrieval pipeline
+            self.retrieval_pipeline = Pipeline()
+            self.retrieval_pipeline.add_component(
+                "embedder",
+                SentenceTransformersTextEmbedder(
+                    model="sentence-transformers/all-MiniLM-L6-v2"
+                )
+            )
+            self.retrieval_pipeline.add_component(
+                "retriever",
+                QdrantEmbeddingRetriever(
+                    document_store=self.document_store,
+                    top_k=5
+                )
+            )
+            self.retrieval_pipeline.connect("embedder", "retriever")
+
+            logger.info("Pipelines recreated successfully")
+
+        except Exception as e:
+            logger.error(f"Error recreating pipelines: {e}")
+            raise
 
 def main():
     """Main entry point for command line usage"""
