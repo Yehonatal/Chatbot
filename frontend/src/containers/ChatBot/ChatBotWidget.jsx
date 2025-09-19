@@ -49,7 +49,7 @@ const FloatingButton = styled(Button)`
 
 const ChatPanel = styled.div`
     position: fixed;
-    bottom: 80px;
+    bottom: 60px;
     right: 20px;
     width: 320px;
     height: 520px;
@@ -151,6 +151,7 @@ const MessageBubble = styled.div`
         props.sender === "user"
             ? `
         background: #f2f8ff;
+        border: 1px solid #b7cfea;
         color: black;
         align-self: flex-end;
         margin-left: auto;
@@ -158,6 +159,7 @@ const MessageBubble = styled.div`
     `
             : `
         background: #FFF1F0;
+        border: 1px solid #fae5e3;
         color: black;
         align-self: flex-start;
     `}
@@ -359,16 +361,6 @@ const suggestedQuestions = [
     "How do I contact support?",
 ];
 
-// Get dynamic suggested questions from templates
-const getSuggestedQuestions = (templates) => {
-    if (!templates || templates.length === 0) {
-        return suggestedQuestions; // fallback to hardcoded
-    }
-    return templates
-        .slice(0, 4)
-        .map((template) => template.messages[0]?.content || template.name);
-};
-
 // Auto-complete options
 const autoCompleteOptions = [
     { value: "pricing", label: "pricing information" },
@@ -380,6 +372,16 @@ const autoCompleteOptions = [
     { value: "documentation", label: "view documentation" },
     { value: "tutorial", label: "tutorials and guides" },
 ];
+
+// Get dynamic suggested questions from templates
+const getSuggestedQuestions = (templates) => {
+    if (!templates || templates.length === 0) {
+        return suggestedQuestions; // fallback to hardcoded
+    }
+    return templates
+        .slice(0, 4)
+        .map((template) => template.messages[0]?.content || template.name);
+};
 
 // Smart suggestions based on context
 const getSmartSuggestions = (messages) => {
@@ -424,30 +426,33 @@ const ChatBotWidget = () => {
     const [inputValue, setInputValue] = useState("");
     const [autoCompleteData, setAutoCompleteData] = useState([]);
     const [showSmartSuggestions, setShowSmartSuggestions] = useState(false);
-    const [templates, setTemplates] = useState([]);
-    const [templatesLoading, setTemplatesLoading] = useState(false);
+    const [_templates, _setTemplates] = useState([]);
+    const [_templatesLoading, _setTemplatesLoading] = useState(false);
     const dispatch = useDispatch();
     const { messages, typing } = useSelector((state) => state.chatBot);
     const messagesEndRef = useRef(null);
+    const smartSuggestionsRef = useRef(null);
 
     const [isFirstVisit, setIsFirstVisit] = useState(true);
-
-    // Fetch conversation templates on component mount
+    //  close when it click outside the suggestions container i know its bulky implementation fr
     useEffect(() => {
-        const fetchTemplates = async () => {
-            try {
-                setTemplatesLoading(true);
-                const templateData = await chatService.getTemplates();
-                setTemplates(templateData);
-            } catch (error) {
-                console.error("Failed to fetch conversation templates:", error);
-            } finally {
-                setTemplatesLoading(false);
+        if (!showSmartSuggestions) return;
+
+        const handleClickOutside = (event) => {
+            if (
+                smartSuggestionsRef.current &&
+                !smartSuggestionsRef.current.contains(event.target)
+            ) {
+                setShowSmartSuggestions(false);
             }
         };
 
-        fetchTemplates();
-    }, []);
+        document.addEventListener("mousedown", handleClickOutside);
+
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [showSmartSuggestions]);
 
     // Load messages from localStorage on component mount
     useEffect(() => {
@@ -478,6 +483,23 @@ const ChatBotWidget = () => {
             localStorage.setItem("chatbot_messages", JSON.stringify(messages));
         }
     }, [messages]);
+
+    // Fetch conversation templates on component mount
+    useEffect(() => {
+        const fetchTemplates = async () => {
+            try {
+                _setTemplatesLoading(true);
+                const templateData = await chatService.getTemplates();
+                _setTemplates(templateData);
+            } catch (error) {
+                console.error("Failed to fetch conversation templates:", error);
+            } finally {
+                _setTemplatesLoading(false);
+            }
+        };
+
+        fetchTemplates();
+    }, []);
 
     const shouldShowSuggestedQuestions = () => {
         return (
@@ -545,7 +567,7 @@ const ChatBotWidget = () => {
     const handleClear = () => {
         dispatch(clearMessages());
         localStorage.removeItem("chatbot_messages"); // Clear localStorage when messages are cleared
-        // setIsFirstVisit(true);
+        setIsFirstVisit(true);
         setInputValue("");
         setAutoCompleteData([]);
         setShowSmartSuggestions(false);
@@ -564,6 +586,8 @@ const ChatBotWidget = () => {
             minute: "2-digit",
         });
     };
+
+    const questions = getSuggestedQuestions(_templates);
 
     return (
         <>
@@ -771,34 +795,20 @@ const ChatBotWidget = () => {
 
                         {shouldShowSuggestedQuestions() && (
                             <SuggestedQuestionsContainer>
-                                {templatesLoading ? (
-                                    <div
-                                        style={{
-                                            textAlign: "center",
-                                            padding: "10px",
-                                            color: "#666",
-                                        }}
-                                    >
-                                        Loading conversation starters...
-                                    </div>
-                                ) : (
-                                    <SuggestedQuestionsGrid>
-                                        {getSuggestedQuestions(templates).map(
-                                            (question, index) => (
-                                                <SuggestedQuestionItem
-                                                    key={index}
-                                                    onClick={() =>
-                                                        handleSuggestedQuestionClick(
-                                                            question
-                                                        )
-                                                    }
-                                                >
-                                                    {question}
-                                                </SuggestedQuestionItem>
-                                            )
-                                        )}
-                                    </SuggestedQuestionsGrid>
-                                )}
+                                <SuggestedQuestionsGrid>
+                                    {questions.map((question, index) => (
+                                        <SuggestedQuestionItem
+                                            key={index}
+                                            onClick={() =>
+                                                handleSuggestedQuestionClick(
+                                                    question
+                                                )
+                                            }
+                                        >
+                                            {question}
+                                        </SuggestedQuestionItem>
+                                    ))}
+                                </SuggestedQuestionsGrid>
                             </SuggestedQuestionsContainer>
                         )}
                     </ChatBody>
@@ -833,9 +843,10 @@ const ChatBotWidget = () => {
                             {showSmartSuggestions &&
                                 getSmartSuggestions(messages).length > 0 && (
                                     <div
+                                        ref={smartSuggestionsRef}
                                         style={{
                                             position: "absolute",
-                                            top: "-120px",
+                                            top: "-140px",
                                             left: 0,
                                             right: 0,
                                             background: "white",
@@ -903,6 +914,7 @@ const ChatBotWidget = () => {
                             type="primary"
                             icon={<SendOutlined />}
                             onClick={handleSend}
+                            disabled={typing}
                         />
                     </ChatFooter>
                 </ChatPanel>
