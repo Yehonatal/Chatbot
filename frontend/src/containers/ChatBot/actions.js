@@ -6,6 +6,7 @@ import {
     SEND_MESSAGE_SUCCESS,
     SEND_MESSAGE_ERROR,
     CLEAR_MESSAGES,
+    UPDATE_USER_REACTION
 } from "./constants";
 
 export function sendMessage(message) {
@@ -54,4 +55,12 @@ export function clearMessages() {
     return {
         type: CLEAR_MESSAGES,
     };
+}
+
+export function updateUserReaction(messageId,reaction){
+
+    return {
+        type:UPDATE_USER_REACTION,
+        payload:{messageId,reaction}
+    }
 }

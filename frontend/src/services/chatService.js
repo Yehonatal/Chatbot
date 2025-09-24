@@ -24,27 +24,19 @@ export const chatService = {
             ) {
                 throw new Error("Message cannot be empty");
             }
-
-            // Prepare the request data, excluding undefined values
             const requestData = {
                 message: messageData.message.trim(),
                 provider: messageData.provider || "gemini",
-                useRag:
-                    messageData.useRag !== undefined
-                        ? messageData.useRag
-                        : true,
+                useRag: messageData.useRag !== undefined ? messageData.useRag : true,
                 topK: messageData.topK || 5,
-            };
-
+            };  
             // Only include sessionId if it exists
             if (messageData.sessionId) {
                 requestData.sessionId = messageData.sessionId;
             }
-
-            console.log("Sending request data:", requestData); // Debug log
-
+    
             const response = await api.post("/chat/message", requestData);
-
+  
             return {
                 success: true,
                 data: response.data,
@@ -57,7 +49,6 @@ export const chatService = {
             };
         }
     },
-
     /**
      * Get chat history for a session
      * @param {string} sessionId - The session ID
@@ -78,6 +69,29 @@ export const chatService = {
             };
         }
     },
+
+    /**
+     * updated user reaction
+     * @param {string} messageId, - The message Id
+     */
+    async updateReaction(messageId, reaction) {
+        try {
+            const res = await api.put(`/chat/userreaction/${messageId}`, { userReaction: reaction });
+
+            
+            return {
+                success: true,
+                data: res.data,
+            };
+        } catch (error) {
+            console.error("Error updating reaction:", error);
+            return {
+                success: false,
+                error: error.response?.data?.message || error.message,
+            };
+        }
+    },
+    
 
     /**
      * Create a new chat session

@@ -6,6 +6,7 @@ import {
     SEND_MESSAGE_ERROR,
     CLEAR_MESSAGES,
     LOAD_MESSAGES_FROM_STORAGE,
+    UPDATE_USER_REACTION,
 } from "./constants";
 
 export const initialState = {
@@ -48,6 +49,16 @@ const chatBotReducer = (state = initialState, action) =>
                 draft.sessionId = null;
                 draft.error = null;
                 break;
+            case UPDATE_USER_REACTION: {
+                const { messageId, reaction } = action.payload;
+                const msg = draft.messages.find((m) => m.id === messageId);
+                if (msg) {
+                msg.userReaction = reaction; 
+                }
+                break;
+                }
+                
+                
         }
     });
 

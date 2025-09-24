@@ -6,15 +6,17 @@ import {
     CommentOutlined, 
     BookOutlined,
     QuestionCircleOutlined, 
-    ClockCircleOutlined ,
+    LikeOutlined, 
+    DislikeOutlined
     
 } from "@ant-design/icons";
 import { Button, Input, AutoComplete, Dropdown, Menu,Tabs } from "antd";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState,useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import { useDispatch, useSelector } from "react-redux";
 import styled, { keyframes } from "styled-components";
 import { clearMessages, sendMessage } from "./actions";
+import { updateUserReaction } from "./actions";
 import {
     ADD_MESSAGE,
     CLEAR_MESSAGES,
@@ -52,6 +54,16 @@ const FloatingButton = styled(Button)`
         outline: none;
     }
 `;
+
+const LikeIconsWrapper=styled.div`
+        display:flex;
+        margin-top:10px;
+        align-items:center;
+        gap:15px;
+        margin-left:5px;
+        font-size:16px;
+        font-weight:bold;    
+        ;`
 
 const ChatPanel = styled.div`
     position: fixed;
@@ -345,6 +357,28 @@ const Icon = styled.img`
     height: 100%;
     border-radius: 50%;
     object-fit: cover;
+`;
+
+const ReactionButton = styled.button`
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    color: ${props => props.active ? '#1890ff' : '#666'};
+    
+    &:hover {
+        background: #f0f0f0;
+        transform: scale(1.1);
+    }
+    
+    &:active {
+        transform: scale(0.95);
+    }
 `;
 
 const ActiveIndicator = styled.div`
@@ -740,6 +774,13 @@ const ChatBotWidget = () => {
         setShowSmartSuggestions(value.length === 0 && messages.length > 0);
     };
 
+    const handleReaction = useCallback((messageId, reaction, event) => {
+        event?.preventDefault();
+        dispatch(updateUserReaction(messageId, reaction));
+    }, [dispatch]);
+    
+
+    
     const handleAutoCompleteSelect = (value) => {
         setInputValue(value);
         setAutoCompleteData([]);
@@ -1042,7 +1083,33 @@ const ChatBotWidget = () => {
                                                     >
                                                         {message.text}
                                                     </ReactMarkdown>
+                                                    <LikeIconsWrapper>
+    <ReactionButton
+    active={message.userReaction === "like"}
+    onClick={(e) => handleReaction(message.id, "like", e)}
+    title="Like this response"
+>
+
+        <LikeOutlined style={{ 
+            color: message.userReaction === "like" ? '#1890ff' : '#666',
+            fontSize: '16px'
+        }} />
+    </ReactionButton>
+    
+    <ReactionButton
+        active={message.userReaction === "dislike"}
+        onClick={() => handleReaction(message.id, "dislike")}
+        title="Dislike this response"
+    >
+        <DislikeOutlined style={{ 
+            color: message.userReaction === "dislike" ? '#ff4d4f' : '#666',
+            fontSize: '16px',
+            transform: "scaleX(-1)"
+        }} />
+    </ReactionButton>
+</LikeIconsWrapper>
                                                 </MessageBubble>
+                                               
                                                 <Timestamp sender="bot">
                                                     {formatTime(
                                                         message.timestamp
