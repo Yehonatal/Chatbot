@@ -77,8 +77,6 @@ export const chatService = {
     async updateReaction(messageId, reaction) {
         try {
             const res = await api.put(`/chat/userreaction/${messageId}`, { userReaction: reaction });
-
-            
             return {
                 success: true,
                 data: res.data,
