@@ -70,10 +70,12 @@ export const chatService = {
         }
     },
 
+    
     /**
      * updated user reaction
      * @param {string} messageId, - The message Id
      */
+
     async updateReaction(messageId, reaction) {
         try {
             const res = await api.put(`/chat/userreaction/${messageId}`, { userReaction: reaction });
